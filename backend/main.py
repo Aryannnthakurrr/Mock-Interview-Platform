@@ -13,7 +13,7 @@ from websocket_handler import InterviewWebSocketHandler
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="MockMaster AI",
+    title="MockMind",
     description="AI-powered mock interview and skill feedback platform",
     version="1.0.0",
 )

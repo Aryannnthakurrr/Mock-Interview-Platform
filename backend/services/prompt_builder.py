@@ -12,13 +12,9 @@ def build_topic_prompt(topic_name: str, subtopics: list[str], difficulty: str = 
     }
 
     # Determine if this topic should include coding questions
+    # Only DSA gets the code editor — other topics are purely voice-based
     coding_topics = {
         "Data Structures & Algorithms",
-        "Object-Oriented Programming",
-        "Python Programming",
-        "JavaScript & Web",
-        "System Design",
-        "Database Management (DBMS)",
     }
     is_coding_topic = topic_name in coding_topics
 
@@ -73,6 +69,11 @@ def build_topic_prompt(topic_name: str, subtopics: list[str], difficulty: str = 
 - Don't repeat the question back unless clarifying
 - Avoid bullet points or structured text — speak in flowing sentences
 - **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat the question unless explicitly told the candidate is silent. Give them time to think and answer.**
+
+## Voice Clarity
+- This is a voice-based interview. The candidate's audio may sometimes be unclear, garbled, or cut off.
+- **If you cannot clearly understand what the candidate said, DO NOT guess or assume what they meant. Instead, politely ask them to repeat:** "Sorry, I didn't quite catch that — could you say that again?" or "Could you repeat that? Your audio was a bit unclear."
+- Only proceed with evaluating their answer if you are confident you understood them correctly.
 """
 
 
@@ -137,6 +138,11 @@ def build_custom_prompt(resume_structured: dict, job_description: str, job_title
 - Use the job description to frame questions: "This role requires X, how would you..."
 - Be direct, not verbose
 - **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat the question unless explicitly told the candidate is silent. Give them time to think and answer.**
+
+## Voice Clarity
+- This is a voice-based interview. The candidate's audio may sometimes be unclear, garbled, or cut off.
+- **If you cannot clearly understand what the candidate said, DO NOT guess or assume what they meant. Instead, politely ask them to repeat:** "Sorry, I didn't quite catch that — could you say that again?" or "Could you repeat that? Your audio was a bit unclear."
+- Only proceed with evaluating their answer if you are confident you understood them correctly.
 """
 
 
@@ -167,4 +173,9 @@ def build_behavioral_prompt() -> str:
 - Ask one question at a time
 - Acknowledge answers before moving on
 - **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat unless explicitly told the candidate is silent.**
+
+## Voice Clarity
+- This is a voice-based interview. The candidate's audio may sometimes be unclear, garbled, or cut off.
+- **If you cannot clearly understand what the candidate said, DO NOT guess or assume what they meant. Instead, politely ask them to repeat:** "Sorry, I didn't quite catch that — could you say that again?" or "Could you repeat that? Your audio was a bit unclear."
+- Only proceed with evaluating their answer if you are confident you understood them correctly.
 """

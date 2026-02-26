@@ -54,13 +54,34 @@ def list_interviews(db: Session = Depends(get_db)):
     return result
 
 
-@router.get("/{session_id}", response_model=InterviewOut)
+@router.get("/{session_id}")
 def get_interview(session_id: int, db: Session = Depends(get_db)):
     """Get full interview session details."""
     session = db.query(InterviewSession).filter(InterviewSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return session
+
+    # Build response with topic_name for frontend
+    topic_name = None
+    if session.topic_id:
+        topic = db.query(InterviewTopic).filter(InterviewTopic.id == session.topic_id).first()
+        topic_name = topic.name if topic else None
+
+    return {
+        "id": session.id,
+        "session_type": session.session_type,
+        "topic_id": session.topic_id,
+        "topic_name": topic_name,
+        "difficulty": session.difficulty,
+        "job_title": session.job_title,
+        "status": session.status,
+        "created_at": session.created_at,
+        "ended_at": session.ended_at,
+        "duration_seconds": session.duration_seconds,
+        "overall_score": session.overall_score,
+        "transcript": session.transcript,
+        "feedback": session.feedback,
+    }
 
 
 @router.patch("/{session_id}")
