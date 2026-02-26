@@ -156,12 +156,59 @@
 }
 
 .jd-area .input {
-    margin-top: 16px;
+    margin-top: 12px;
     margin-bottom: 12px;
 }
 
 .jd-area .textarea {
     margin-top: 0;
+}
+
+/* ── JD Template Chips ───────────────────────────── */
+.jd-templates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.jd-template-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.jd-template-chip:hover {
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.jd-template-chip.active {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: 0 0 0 1px var(--accent-blue);
+}
+
+.chip-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.chip-label {
+    line-height: 1;
 }
 
 .dropzone {

@@ -44,6 +44,17 @@ class GeminiLiveSession:
                         )
                     )
                 ),
+                realtime_input_config=types.RealtimeInputConfig(
+                    activity_handling="START_OF_ACTIVITY_INTERRUPTS",
+                    automatic_activity_detection=types.AutomaticActivityDetection(
+                        # HIGH = detect speech start quickly so no words are missed
+                        start_of_speech_sensitivity="START_SENSITIVITY_HIGH",
+                        # HIGH = detect end of speech quickly for snappy response
+                        end_of_speech_sensitivity="END_SENSITIVITY_HIGH",
+                        # 500ms silence = user finished their sentence
+                        silence_duration_ms=500,
+                    ),
+                ),
             )
 
             # live.connect() returns an async context manager

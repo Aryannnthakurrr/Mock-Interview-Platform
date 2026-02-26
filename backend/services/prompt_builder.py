@@ -39,6 +39,7 @@ def build_topic_prompt(topic_name: str, subtopics: list[str], difficulty: str = 
 - Use conversational phrases: "That's a good point", "Could you elaborate on...", "What about..."
 - Don't repeat the question back unless clarifying
 - Avoid bullet points or structured text — speak in flowing sentences
+- **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat the question unless explicitly told the candidate is silent. Give them time to think and answer.**
 """
 
 
@@ -102,6 +103,7 @@ def build_custom_prompt(resume_structured: dict, job_description: str, job_title
 - Reference specific resume items: "I see you worked on [project]... tell me about..."
 - Use the job description to frame questions: "This role requires X, how would you..."
 - Be direct, not verbose
+- **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat the question unless explicitly told the candidate is silent. Give them time to think and answer.**
 """
 
 
@@ -131,4 +133,5 @@ def build_behavioral_prompt() -> str:
 - Warm and encouraging
 - Ask one question at a time
 - Acknowledge answers before moving on
+- **IMPORTANT: After asking a question, STOP and WAIT in silence for the candidate to respond. Do NOT keep talking. Do NOT rephrase or repeat unless explicitly told the candidate is silent.**
 """

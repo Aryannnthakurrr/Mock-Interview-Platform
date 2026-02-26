@@ -31,6 +31,7 @@ export default function LiveInterview() {
     const isPlayingRef = useRef(false)
     const partialTextRef = useRef('')
     const partialUserTextRef = useRef('')
+    const aiTurnDoneRef = useRef(false)
 
     // Auto-scroll transcript
     useEffect(() => {
@@ -72,6 +73,12 @@ export default function LiveInterview() {
         if (audioQueueRef.current.length === 0) {
             isPlayingRef.current = false
             setAiSpeaking(false)
+            // Only send playback_complete if the AI turn is actually finished
+            // (prevents premature firing between audio chunks)
+            if (aiTurnDoneRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+                aiTurnDoneRef.current = false
+                wsRef.current.send(JSON.stringify({ type: 'playback_complete' }))
+            }
             return
         }
         isPlayingRef.current = true
@@ -112,6 +119,7 @@ export default function LiveInterview() {
                     break
 
                 case 'audio':
+                    aiTurnDoneRef.current = false
                     playAudioChunk(data.data)
                     break
 
@@ -151,6 +159,12 @@ export default function LiveInterview() {
 
                 case 'turn_complete':
                     if (data.role === 'interviewer') {
+                        aiTurnDoneRef.current = true
+                        // If audio already finished playing, send playback_complete now
+                        if (!isPlayingRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+                            aiTurnDoneRef.current = false
+                            wsRef.current.send(JSON.stringify({ type: 'playback_complete' }))
+                        }
                         setTranscript(prev => {
                             const updated = [...prev]
                             const lastIdx = updated.length - 1
@@ -235,7 +249,13 @@ export default function LiveInterview() {
 
             processor.onaudioprocess = (e) => {
                 if (isMutedRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+
                 const float32 = e.inputBuffer.getChannelData(0)
+
+                // Light noise gate — only filter dead silence so Gemini VAD isn't flooded
+                let sumSq = 0
+                for (let i = 0; i < float32.length; i++) sumSq += float32[i] * float32[i]
+                if (Math.sqrt(sumSq / float32.length) < 0.006) return
 
                 // Resample from native rate to 16kHz
                 const ratio = targetSampleRate / nativeSampleRate

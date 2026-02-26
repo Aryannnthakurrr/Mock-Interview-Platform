@@ -4,6 +4,129 @@ import './InterviewSetup.css'
 
 const API = 'http://localhost:8000'
 
+const JD_TEMPLATES = [
+    {
+        id: 'frontend',
+        icon: '🖥️',
+        title: 'Frontend Developer',
+        description: `We are looking for a skilled Frontend Developer to build responsive, performant web applications.
+
+Responsibilities:
+• Develop and maintain user-facing features using React, HTML, CSS, and JavaScript
+• Collaborate with designers and backend engineers to deliver seamless experiences
+• Optimize applications for speed, scalability, and cross-browser compatibility
+• Write clean, testable, and well-documented code
+• Participate in code reviews and contribute to frontend architecture decisions
+
+Requirements:
+• 2+ years of experience with React or similar frameworks (Vue, Angular)
+• Strong proficiency in JavaScript/TypeScript, HTML5, and CSS3
+• Experience with state management (Redux, Zustand, Context API)
+• Familiarity with RESTful APIs, Git, and CI/CD pipelines
+• Understanding of web accessibility (WCAG) and responsive design principles`,
+    },
+    {
+        id: 'backend',
+        icon: '⚙️',
+        title: 'Backend Engineer',
+        description: `We are seeking a Backend Engineer to design and build scalable server-side systems and APIs.
+
+Responsibilities:
+• Design, develop, and maintain RESTful and GraphQL APIs
+• Build and optimize database schemas (SQL and NoSQL)
+• Implement authentication, authorization, and security best practices
+• Write unit and integration tests to ensure reliability
+• Monitor, troubleshoot, and improve system performance
+
+Requirements:
+• 2+ years backend development experience (Python, Node.js, Java, or Go)
+• Strong knowledge of relational databases (PostgreSQL, MySQL) and caching (Redis)
+• Experience with cloud platforms (AWS, GCP, or Azure)
+• Familiarity with containerization (Docker) and orchestration (Kubernetes)
+• Understanding of microservices architecture and event-driven systems`,
+    },
+    {
+        id: 'fullstack',
+        icon: '🔗',
+        title: 'Full Stack Developer',
+        description: `Join our team as a Full Stack Developer to work across the entire application stack.
+
+Responsibilities:
+• Build end-to-end features from database to UI
+• Develop and maintain both frontend (React/Next.js) and backend (Node.js/Python) code
+• Design database schemas and write efficient queries
+• Deploy and manage applications using cloud services
+• Collaborate with product, design, and QA teams
+
+Requirements:
+• 3+ years of full stack development experience
+• Proficiency in JavaScript/TypeScript, React, and Node.js or Python
+• Experience with SQL and NoSQL databases
+• Familiarity with cloud services (AWS/GCP), Docker, and CI/CD
+• Strong problem-solving skills and attention to code quality`,
+    },
+    {
+        id: 'data-scientist',
+        icon: '📊',
+        title: 'Data Scientist',
+        description: `We are hiring a Data Scientist to derive actionable insights from complex datasets.
+
+Responsibilities:
+• Analyze large datasets to identify trends, patterns, and opportunities
+• Build and deploy machine learning models for prediction and classification
+• Design and run A/B tests and statistical experiments
+• Create dashboards and reports for stakeholders
+• Collaborate with engineering teams to productionize ML models
+
+Requirements:
+• 2+ years of experience in data science or machine learning
+• Strong proficiency in Python (pandas, scikit-learn, TensorFlow/PyTorch)
+• Solid foundation in statistics, probability, and linear algebra
+• Experience with SQL and data visualization tools (Matplotlib, Tableau)
+• Familiarity with cloud ML platforms and MLOps practices`,
+    },
+    {
+        id: 'devops',
+        icon: '🚀',
+        title: 'DevOps Engineer',
+        description: `We are looking for a DevOps Engineer to build and maintain our cloud infrastructure and CI/CD pipelines.
+
+Responsibilities:
+• Design and manage cloud infrastructure using IaC (Terraform, CloudFormation)
+• Build and maintain CI/CD pipelines for automated testing and deployment
+• Monitor system health, set up alerting, and respond to incidents
+• Implement security best practices and manage access controls
+• Optimize costs and performance of cloud resources
+
+Requirements:
+• 2+ years in DevOps, SRE, or infrastructure engineering
+• Proficiency with AWS, GCP, or Azure cloud services
+• Experience with Docker, Kubernetes, and container orchestration
+• Strong scripting skills (Bash, Python)
+• Knowledge of monitoring tools (Prometheus, Grafana, Datadog)`,
+    },
+    {
+        id: 'product-manager',
+        icon: '📋',
+        title: 'Product Manager',
+        description: `We are seeking a Product Manager to drive product strategy and deliver impactful features.
+
+Responsibilities:
+• Define product vision, strategy, and roadmap aligned with business goals
+• Gather and prioritize requirements from users, stakeholders, and data
+• Write clear product specs, user stories, and acceptance criteria
+• Work closely with engineering, design, and marketing teams
+• Analyze product metrics and iterate based on user feedback
+
+Requirements:
+• 3+ years of product management experience in tech
+• Strong analytical skills with experience using data to drive decisions
+• Excellent written and verbal communication skills
+• Familiarity with Agile/Scrum methodologies
+• Experience with product analytics tools (Amplitude, Mixpanel, Google Analytics)`,
+    },
+]
+
 export default function InterviewSetup() {
     const navigate = useNavigate()
     const [mode, setMode] = useState('topic') // 'topic' or 'custom'
@@ -19,6 +142,7 @@ export default function InterviewSetup() {
     const [jobTitle, setJobTitle] = useState('')
     const [uploading, setUploading] = useState(false)
     const [starting, setStarting] = useState(false)
+    const [selectedTemplate, setSelectedTemplate] = useState(null)
 
     const fileInputRef = useRef(null)
 
@@ -214,18 +338,43 @@ export default function InterviewSetup() {
                         {/* Job Description */}
                         <div className="jd-area glass-card">
                             <h3>💼 Job Details</h3>
-                            <p className="text-secondary">Provide the role you're preparing for</p>
+                            <p className="text-secondary">Pick a template or write your own</p>
+
+                            {/* JD Template Selector */}
+                            <div className="jd-templates">
+                                {JD_TEMPLATES.map(t => (
+                                    <button
+                                        key={t.id}
+                                        className={`jd-template-chip ${selectedTemplate === t.id ? 'active' : ''}`}
+                                        onClick={() => {
+                                            if (selectedTemplate === t.id) {
+                                                setSelectedTemplate(null)
+                                                setJobTitle('')
+                                                setJobDescription('')
+                                            } else {
+                                                setSelectedTemplate(t.id)
+                                                setJobTitle(t.title)
+                                                setJobDescription(t.description)
+                                            }
+                                        }}
+                                    >
+                                        <span className="chip-icon">{t.icon}</span>
+                                        <span className="chip-label">{t.title}</span>
+                                    </button>
+                                ))}
+                            </div>
+
                             <input
                                 className="input"
                                 placeholder="Job Title (e.g., Senior Software Engineer)"
                                 value={jobTitle}
-                                onChange={e => setJobTitle(e.target.value)}
+                                onChange={e => { setJobTitle(e.target.value); setSelectedTemplate(null) }}
                             />
                             <textarea
                                 className="textarea"
                                 placeholder="Paste the job description here... (responsibilities, requirements, etc.)"
                                 value={jobDescription}
-                                onChange={e => setJobDescription(e.target.value)}
+                                onChange={e => { setJobDescription(e.target.value); setSelectedTemplate(null) }}
                                 rows={8}
                             />
                         </div>

@@ -30,6 +30,8 @@ class InterviewWebSocketHandler:
         self.is_active = False
         self._current_ai_text = ""
         self._current_user_text = ""
+        self._silence_timer: asyncio.Task | None = None
+        self._user_spoke = False
 
     async def run(self):
         """Main handler loop."""
@@ -84,6 +86,11 @@ class InterviewWebSocketHandler:
                 )
             )
 
+            # Trigger the AI to speak first — introduce itself and ask the first question
+            await self.gemini_session.send_text(
+                "Begin the interview now. Introduce yourself and ask your first question."
+            )
+
             # Listen for messages from client
             try:
                 while self.is_active:
@@ -102,6 +109,12 @@ class InterviewWebSocketHandler:
                         self._audio_chunk_count += 1
                         if self._audio_chunk_count <= 3 or self._audio_chunk_count % 100 == 0:
                             logger.info(f"Session {self.session_id}: audio chunk #{self._audio_chunk_count}, size={len(message['bytes'])} bytes")
+                        # User is sending audio — they are speaking, cancel re-prompt timer
+                        if not self._user_spoke:
+                            self._user_spoke = True
+                            if self._silence_timer and not self._silence_timer.done():
+                                self._silence_timer.cancel()
+                                logger.info(f"Session {self.session_id}: silence timer cancelled — user audio detected")
                         await self.gemini_session.send_audio(message["bytes"])
 
                     elif "text" in message:
@@ -113,6 +126,8 @@ class InterviewWebSocketHandler:
 
             # Cleanup
             self.is_active = False
+            if self._silence_timer and not self._silence_timer.done():
+                self._silence_timer.cancel()
             receive_task.cancel()
             try:
                 await receive_task
@@ -215,9 +230,28 @@ class InterviewWebSocketHandler:
         except Exception as e:
             logger.error(f"Error sending turn complete: {e}")
 
+    async def _silence_reprompt(self):
+        """Wait for user response; if silence persists, nudge Gemini to re-prompt."""
+        try:
+            await asyncio.sleep(10)
+            if not self._user_spoke and self.is_active and self.gemini_session and self.gemini_session.is_active:
+                logger.info(f"Session {self.session_id}: No response after 10s, asking Gemini to re-prompt")
+                await self.gemini_session.send_text(
+                    "[The candidate has been silent for a few seconds. "
+                    "Gently repeat or rephrase your last question to prompt them.]"
+                )
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Silence re-prompt error: {e}")
+
     async def _handle_user_transcription(self, text: str):
         """Handle user speech transcription from Gemini input_transcription."""
         self._current_user_text += text
+        # User spoke — cancel silence re-prompt timer
+        self._user_spoke = True
+        if self._silence_timer and not self._silence_timer.done():
+            self._silence_timer.cancel()
         try:
             await self._send_json({
                 "type": "transcript",
@@ -256,6 +290,14 @@ class InterviewWebSocketHandler:
                 asyncio.create_task(
                     self._analyze_emotion_frame(image_data, db)
                 )
+
+        elif msg_type == "playback_complete":
+            # Client finished playing all queued AI audio — now start silence timer
+            logger.info(f"Session {self.session_id}: AI audio playback finished, starting silence timer")
+            self._user_spoke = False
+            if self._silence_timer and not self._silence_timer.done():
+                self._silence_timer.cancel()
+            self._silence_timer = asyncio.create_task(self._silence_reprompt())
 
         elif msg_type == "end":
             # Client ending interview
