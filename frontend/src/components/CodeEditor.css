@@ -1,0 +1,287 @@
+/* ── Code Editor Panel ─────────────────────────────── */
+.code-editor-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+    background: #1e1e1e;
+}
+
+/* ── Toolbar ──────────────────────────────────────── */
+.code-editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(10, 14, 26, 0.95);
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.ce-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ce-toolbar-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.language-select {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    font-family: var(--font-family);
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.language-select:focus {
+    border-color: var(--accent-blue);
+}
+
+.language-select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.ce-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-stdin {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-stdin:hover,
+.btn-stdin.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.btn-share {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-share:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+}
+
+.btn-share:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-share.shared {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--accent-emerald);
+    color: var(--accent-emerald);
+}
+
+.btn-run {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-run:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-run:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: ce-spin 0.6s linear infinite;
+}
+
+@keyframes ce-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Editor Body ──────────────────────────────────── */
+.code-editor-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.editor-container {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Stdin Section ────────────────────────────────── */
+.stdin-section {
+    border-top: 1px solid var(--border-subtle);
+    padding: 8px 12px;
+    background: rgba(10, 14, 26, 0.8);
+    flex-shrink: 0;
+}
+
+.stdin-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.stdin-input {
+    width: 100%;
+    background: #0d1117;
+    color: var(--text-primary);
+    border: 1px solid var(--border-card);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: 'Fira Code', 'Cascadia Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+    outline: none;
+    min-height: 40px;
+    max-height: 100px;
+    line-height: 1.5;
+}
+
+.stdin-input:focus {
+    border-color: var(--accent-blue);
+}
+
+/* ── Output Section ───────────────────────────────── */
+.output-section {
+    border-top: 1px solid var(--border-subtle);
+    max-height: 200px;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(10, 14, 26, 0.9);
+    flex-shrink: 0;
+}
+
+.output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.output-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.output-meta {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.output-content {
+    padding: 10px 12px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 40px;
+}
+
+.output-placeholder,
+.output-running {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-style: italic;
+}
+
+.output-content pre {
+    margin: 0;
+    font-family: 'Fira Code', 'Cascadia Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.output-stdout {
+    color: #e2e8f0;
+}
+
+.output-stderr {
+    color: #fca5a5;
+}
+
+.output-error {
+    color: #f87171;
+}
+
+.output-compile {
+    color: #fbbf24;
+}
+
+/* ── Responsive ───────────────────────────────────── */
+@media (max-width: 900px) {
+    .code-editor-panel {
+        min-height: 300px;
+    }
+
+    .code-editor-toolbar {
+        padding: 6px 10px;
+    }
+
+    .ce-toolbar-title {
+        display: none;
+    }
+}
