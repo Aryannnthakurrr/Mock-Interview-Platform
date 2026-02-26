@@ -6,7 +6,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, SessionLocal
-from routers import topics, resume, interviews, feedback
+from routers import topics, resume, interviews, feedback, code
 from routers.topics import seed_topics
 from websocket_handler import InterviewWebSocketHandler
 
@@ -32,6 +32,7 @@ app.include_router(topics.router)
 app.include_router(resume.router)
 app.include_router(interviews.router)
 app.include_router(feedback.router)
+app.include_router(code.router)
 
 
 # ── Startup ─────────────────────────────────────────

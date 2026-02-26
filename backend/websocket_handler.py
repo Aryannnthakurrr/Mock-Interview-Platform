@@ -291,6 +291,50 @@ class InterviewWebSocketHandler:
                     self._analyze_emotion_frame(image_data, db)
                 )
 
+        elif msg_type == "code_share":
+            # Candidate shared their code for AI review / pair programming
+            code_content = data.get("code", "")
+            code_lang = data.get("language", "python")
+            if code_content.strip() and self.gemini_session and self.gemini_session.is_active:
+                logger.info(f"Session {self.session_id}: Candidate shared code ({code_lang}, {len(code_content)} chars)")
+                await self.gemini_session.send_text(
+                    f"[The candidate has shared their code for you to review. "
+                    f"Language: {code_lang}]\n\n```{code_lang}\n{code_content}\n```\n\n"
+                    f"[Review their code. Point out any issues, suggest improvements, "
+                    f"or ask them to explain their approach. Be constructive and guide "
+                    f"them like a pair-programming partner. Keep your response concise and spoken.]"
+                )
+                # Also save to transcript
+                self.transcript.append({
+                    "role": "candidate",
+                    "content": f"[Shared code ({code_lang})]\n```{code_lang}\n{code_content}\n```",
+                    "timestamp": time.time() - self.start_time,
+                })
+
+        elif msg_type == "code_run_result":
+            # Candidate ran their code and is sharing the results
+            stdout = data.get("stdout", "")
+            stderr = data.get("stderr", "")
+            status = data.get("status", "")
+            code_content = data.get("code", "")
+            code_lang = data.get("language", "python")
+            if self.gemini_session and self.gemini_session.is_active:
+                result_text = f"[The candidate just ran their code.]\n"
+                if code_content:
+                    result_text += f"```{code_lang}\n{code_content}\n```\n"
+                result_text += f"Status: {status}\n"
+                if stdout:
+                    result_text += f"Output:\n```\n{stdout}\n```\n"
+                if stderr:
+                    result_text += f"Errors:\n```\n{stderr}\n```\n"
+                result_text += (
+                    "[Briefly comment on the output. If there are errors, help them debug. "
+                    "If it's correct, acknowledge it and move on or suggest optimizations. "
+                    "Keep it concise and conversational.]"
+                )
+                await self.gemini_session.send_text(result_text)
+                logger.info(f"Session {self.session_id}: Candidate shared code execution result")
+
         elif msg_type == "playback_complete":
             # Client finished playing all queued AI audio — now start silence timer
             logger.info(f"Session {self.session_id}: AI audio playback finished, starting silence timer")

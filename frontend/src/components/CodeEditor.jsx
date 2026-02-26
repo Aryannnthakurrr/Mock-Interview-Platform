@@ -13,7 +13,7 @@ const LANGUAGES = [
     { id: 'typescript', label: 'TypeScript', icon: '🔷', defaultCode: '// Write your solution here\n\nfunction solution(): void {\n    \n}\n\nsolution();\n' },
 ]
 
-export default function CodeEditor({ defaultLanguage = 'python', wsRef = null }) {
+export default function CodeEditor({ defaultLanguage = 'python', wsRef = null, onClose = null }) {
     const [language, setLanguage] = useState(defaultLanguage)
     const [code, setCode] = useState(
         LANGUAGES.find(l => l.id === defaultLanguage)?.defaultCode || ''
@@ -23,6 +23,7 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
     const [running, setRunning] = useState(false)
     const [showStdin, setShowStdin] = useState(false)
     const [shared, setShared] = useState(false)
+    const [autoShare, setAutoShare] = useState(true)
     const editorRef = useRef(null)
     const runRef = useRef(null)
     const shareTimerRef = useRef(null)
@@ -39,6 +40,20 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
         setShared(true)
         setTimeout(() => setShared(false), 2000)
     }, [code, language, wsRef])
+
+    // Share execution results with AI
+    const shareRunResultWithAI = useCallback((result, sourceCode) => {
+        if (!wsRef?.current || wsRef.current.readyState !== WebSocket.OPEN) return
+        wsRef.current.send(JSON.stringify({
+            type: 'code_run_result',
+            code: sourceCode,
+            language,
+            stdout: result.stdout || '',
+            stderr: result.stderr || '',
+            compile_output: result.compile_output || '',
+            status: result.status || '',
+        }))
+    }, [language, wsRef])
 
     const runCode = useCallback(async () => {
         if (running) return
@@ -64,12 +79,17 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
             }
             const data = await res.json()
             setOutput(data)
+
+            // Auto-share results with AI interviewer
+            if (autoShare) {
+                shareRunResultWithAI(data, currentCode)
+            }
         } catch (err) {
             setOutput({ error: 'Network error: ' + err.message })
         } finally {
             setRunning(false)
         }
-    }, [code, language, stdin, running])
+    }, [code, language, stdin, running, autoShare, shareRunResultWithAI])
 
     // Keep a ref to the latest runCode so the Monaco action always calls current version
     runRef.current = runCode
@@ -83,6 +103,14 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
             label: 'Run Code',
             keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
             run: () => runRef.current?.(),
+        })
+
+        // Ctrl+Shift+S to share code with AI
+        editor.addAction({
+            id: 'share-code',
+            label: 'Share with AI',
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS],
+            run: () => shareCodeWithAI(),
         })
     }
 
@@ -104,7 +132,7 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
             {/* Toolbar */}
             <div className="code-editor-toolbar">
                 <div className="ce-toolbar-left">
-                    <span className="ce-toolbar-title">💻 Code</span>
+                    <span className="ce-toolbar-title">💻 Code Editor</span>
                     <select
                         className="language-select"
                         value={language}
@@ -116,11 +144,19 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
                     </select>
                 </div>
                 <div className="ce-toolbar-right">
+                    <label className="auto-share-toggle" title="Auto-share results with AI after running">
+                        <input
+                            type="checkbox"
+                            checked={autoShare}
+                            onChange={e => setAutoShare(e.target.checked)}
+                        />
+                        <span className="toggle-label">Auto-share</span>
+                    </label>
                     <button
                         className={`btn-share ${shared ? 'shared' : ''}`}
                         onClick={shareCodeWithAI}
                         disabled={!code.trim()}
-                        title="Share your code with the AI interviewer"
+                        title="Share code with AI (Ctrl+Shift+S)"
                     >
                         {shared ? '✅ Shared!' : '📤 Share with AI'}
                     </button>
@@ -135,6 +171,7 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
                         className="btn-run"
                         onClick={runCode}
                         disabled={running || !code.trim()}
+                        title="Run code (Ctrl+Enter)"
                     >
                         {running ? (
                             <><span className="spinner-sm"></span> Running...</>
@@ -142,6 +179,15 @@ export default function CodeEditor({ defaultLanguage = 'python', wsRef = null })
                             <>▶ Run</>
                         )}
                     </button>
+                    {onClose && (
+                        <button
+                            className="btn-close-editor"
+                            onClick={onClose}
+                            title="Close code editor"
+                        >
+                            ✕
+                        </button>
+                    )}
                 </div>
             </div>
 

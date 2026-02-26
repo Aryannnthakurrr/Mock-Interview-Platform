@@ -109,6 +109,134 @@
     color: var(--text-secondary);
 }
 
+/* ── Code Editor Toggle Button ───────────────────── */
+.btn-code-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: 1px solid var(--border-card);
+    background: transparent;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.btn-code-toggle:hover {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #818cf8;
+    transform: translateY(-1px);
+}
+
+.btn-code-toggle.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #a5b4fc;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+}
+
+.btn-code-toggle.hint-pulse {
+    animation: code-hint-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes code-hint-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+        border-color: rgba(99, 102, 241, 0.6);
+    }
+
+    50% {
+        box-shadow: 0 0 16px 4px rgba(99, 102, 241, 0.3);
+        border-color: rgba(99, 102, 241, 0.8);
+        background: rgba(99, 102, 241, 0.15);
+    }
+}
+
+.code-icon {
+    font-size: 1rem;
+}
+
+.code-toggle-label {
+    font-size: 0.8rem;
+}
+
+/* ── Code Editor Hint Banner ─────────────────────── */
+.code-hint-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1));
+    border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 5;
+    animation: slideDown 0.3s ease;
+}
+
+.code-hint-banner:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(139, 92, 246, 0.15));
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.hint-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.hint-text {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #c7d2fe;
+}
+
+.hint-dismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.hint-dismiss:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+/* ── Ready Screen Hint ───────────────────────────── */
+.ready-hint {
+    font-size: 0.85rem;
+    color: #a5b4fc;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 20px;
+}
+
 /* ── Main Layout ──────────────────────────────────── */
 .interview-main {
     flex: 1;
@@ -116,6 +244,33 @@
     grid-template-columns: 1fr 340px;
     overflow: hidden;
     position: relative;
+    transition: grid-template-columns 0.3s ease;
+}
+
+/* Layout with code editor open — 3-column split */
+.interview-main.with-code-editor {
+    grid-template-columns: minmax(280px, 1fr) minmax(400px, 1.5fr) 260px;
+}
+
+.code-editor-wrapper {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+    animation: editorSlideIn 0.3s ease;
+}
+
+@keyframes editorSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* ── Overlay ──────────────────────────────────────── */
@@ -382,10 +537,21 @@
 }
 
 /* ── Responsive ───────────────────────────────────── */
+@media (max-width: 1200px) {
+    .interview-main.with-code-editor {
+        grid-template-columns: minmax(240px, 1fr) minmax(350px, 1.2fr) 220px;
+    }
+}
+
 @media (max-width: 900px) {
     .interview-main {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr auto;
+    }
+
+    .interview-main.with-code-editor {
+        grid-template-columns: 1fr;
+        grid-template-rows: 40vh 1fr auto;
     }
 
     .side-panel {
@@ -396,5 +562,9 @@
     .webcam-section {
         width: 200px;
         aspect-ratio: 4/3;
+    }
+
+    .code-toggle-label {
+        display: none;
     }
 }

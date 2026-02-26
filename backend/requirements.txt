@@ -13,3 +13,4 @@ python-dotenv==1.0.1
 aiofiles==24.1.0
 deepface
 tf-keras
+judge0

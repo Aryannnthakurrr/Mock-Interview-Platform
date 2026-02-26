@@ -11,6 +11,39 @@ def build_topic_prompt(topic_name: str, subtopics: list[str], difficulty: str = 
         "advanced": "Ask deep, nuanced questions. Include scenario-based problems, trade-offs, and edge cases. Expect expert-level answers."
     }
 
+    # Determine if this topic should include coding questions
+    coding_topics = {
+        "Data Structures & Algorithms",
+        "Object-Oriented Programming",
+        "Python Programming",
+        "JavaScript & Web",
+        "System Design",
+        "Database Management (DBMS)",
+    }
+    is_coding_topic = topic_name in coding_topics
+
+    coding_instructions = ""
+    if is_coding_topic:
+        coding_instructions = """
+
+## Code-Based Questions & Pair Programming
+- **You MUST include coding questions** as part of this interview. At least 3-4 of your questions should require the candidate to write actual code.
+- When asking a coding question, explicitly tell the candidate: "Go ahead and open the code editor and write your solution" or "Use the code editor to implement this".
+- After asking a coding problem, WAIT for the candidate to write and share their code. Do NOT provide the solution yourself.
+- When the candidate shares their code with you, act as a **pair-programming partner**:
+  - Review their code carefully and identify bugs, edge cases, or improvements
+  - Ask them to explain their approach: "Walk me through your code" or "What's the time complexity?"
+  - If there are bugs, give hints rather than the answer: "What happens when the input is empty?" or "Think about edge cases"
+  - If they're stuck, provide incremental hints: first a conceptual hint, then more specific guidance
+  - If they run their code and get errors, help them debug conversationally
+  - If their solution works, discuss optimizations: "Can you think of a more efficient approach?"
+- For DSA-type questions, ask about:
+  - Time and space complexity after they share their solution
+  - Alternative approaches or data structures
+  - Edge cases they might have missed
+- **Keep the pair-programming natural and conversational** — guide them like a supportive senior engineer would
+"""
+
     return f"""You are a senior technical interviewer conducting a mock interview focused on **{topic_name}**.
 
 ## Your Role
@@ -33,7 +66,7 @@ def build_topic_prompt(topic_name: str, subtopics: list[str], difficulty: str = 
 6. **Cover breadth** — try to touch on multiple subtopics across the interview
 7. **Keep track** of which areas the candidate is strong/weak in
 8. After about 8-12 questions (or ~15 minutes), wrap up naturally by thanking them and giving a brief verbal summary of their performance
-
+{coding_instructions}
 ## Speaking Style
 - Keep responses SHORT and natural — you're speaking, not writing an essay
 - Use conversational phrases: "That's a good point", "Could you elaborate on...", "What about..."

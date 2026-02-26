@@ -1,9 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import CodeEditor from '../components/CodeEditor'
 import './LiveInterview.css'
 
 const WS_URL = 'ws://localhost:8000'
 const API = 'http://localhost:8000'
+
+// Topics that should show code editor by default
+const CODING_TOPIC_NAMES = [
+    'Data Structures & Algorithms',
+    'Object-Oriented Programming',
+    'Python Programming',
+    'JavaScript & Web',
+    'System Design',
+    'Database Management (DBMS)',
+]
 
 export default function LiveInterview() {
     const { sessionId } = useParams()
@@ -17,6 +28,9 @@ export default function LiveInterview() {
     const [elapsed, setElapsed] = useState(0)
     const [isMuted, setIsMuted] = useState(false)
     const [aiSpeaking, setAiSpeaking] = useState(false)
+    const [showCodeEditor, setShowCodeEditor] = useState(false)
+    const [isCodingTopic, setIsCodingTopic] = useState(false)
+    const [codeEditorHint, setCodeEditorHint] = useState(false)
 
     const wsRef = useRef(null)
     const audioContextRef = useRef(null)
@@ -32,6 +46,45 @@ export default function LiveInterview() {
     const partialTextRef = useRef('')
     const partialUserTextRef = useRef('')
     const aiTurnDoneRef = useRef(false)
+
+    // Fetch session info to determine if it's a coding topic
+    useEffect(() => {
+        fetch(`${API}/api/interviews/${sessionId}`)
+            .then(r => r.json())
+            .then(session => {
+                if (session.topic_id) {
+                    fetch(`${API}/api/topics/${session.topic_id}`)
+                        .then(r => r.json())
+                        .then(topic => {
+                            if (CODING_TOPIC_NAMES.includes(topic.name)) {
+                                setIsCodingTopic(true)
+                            }
+                        })
+                        .catch(() => { })
+                }
+            })
+            .catch(() => { })
+    }, [sessionId])
+
+    // Detect when AI asks a coding question — show a hint to open the editor
+    useEffect(() => {
+        if (!isCodingTopic || showCodeEditor) return
+        const lastMsg = transcript[transcript.length - 1]
+        if (lastMsg?.role === 'interviewer' && !lastMsg.partial) {
+            const text = lastMsg.content.toLowerCase()
+            const codingKeywords = [
+                'write a function', 'write code', 'implement', 'code editor',
+                'write a program', 'write the code', 'coding question',
+                'solve this', 'code it up', 'write a solution', 'write a method',
+                'open the code editor', 'use the code editor',
+            ]
+            if (codingKeywords.some(kw => text.includes(kw))) {
+                setCodeEditorHint(true)
+                // Auto-dismiss after 8 seconds
+                setTimeout(() => setCodeEditorHint(false), 8000)
+            }
+        }
+    }, [transcript, isCodingTopic, showCodeEditor])
 
     // Auto-scroll transcript
     useEffect(() => {
@@ -344,6 +397,11 @@ export default function LiveInterview() {
         return map[emotion] || '😐'
     }
 
+    const toggleCodeEditor = () => {
+        setShowCodeEditor(prev => !prev)
+        setCodeEditorHint(false)
+    }
+
     return (
         <div className="live-interview-page">
             {/* ── Top Bar ───────────────────────────── */}
@@ -365,6 +423,19 @@ export default function LiveInterview() {
                             <span className="emotion-label">{currentEmotion.dominant_emotion}</span>
                         </div>
                     )}
+
+                    {/* Code Editor Toggle */}
+                    {status === 'active' && (
+                        <button
+                            className={`btn-code-toggle ${showCodeEditor ? 'active' : ''} ${codeEditorHint ? 'hint-pulse' : ''}`}
+                            onClick={toggleCodeEditor}
+                            title={showCodeEditor ? 'Close code editor' : 'Open code editor'}
+                        >
+                            <span className="code-icon">💻</span>
+                            <span className="code-toggle-label">{showCodeEditor ? 'Hide Code' : 'Code Editor'}</span>
+                        </button>
+                    )}
+
                     {status === 'active' && (
                         <button className="btn btn-danger btn-sm" onClick={endInterview}>
                             End Interview
@@ -373,8 +444,17 @@ export default function LiveInterview() {
                 </div>
             </div>
 
+            {/* ── Code Editor Hint Notification ─────── */}
+            {codeEditorHint && !showCodeEditor && (
+                <div className="code-hint-banner" onClick={() => { setShowCodeEditor(true); setCodeEditorHint(false) }}>
+                    <span className="hint-icon">💡</span>
+                    <span className="hint-text">The interviewer asked a coding question! Click here to open the code editor</span>
+                    <button className="hint-dismiss" onClick={(e) => { e.stopPropagation(); setCodeEditorHint(false) }}>✕</button>
+                </div>
+            )}
+
             {/* ── Main Content ─────────────────────── */}
-            <div className="interview-main">
+            <div className={`interview-main ${showCodeEditor ? 'with-code-editor' : ''}`}>
                 {/* Status overlay */}
                 {(status === 'connecting' || status === 'ready' || status === 'error') && (
                     <div className="interview-overlay">
@@ -403,6 +483,9 @@ export default function LiveInterview() {
                                     <div className="ready-icon">🎙️</div>
                                     <h2>Ready to Start</h2>
                                     <p>Your AI interviewer is ready. Make sure your microphone and camera are working.</p>
+                                    {isCodingTopic && (
+                                        <p className="ready-hint">📝 This is a coding interview — a code editor will be available during the session.</p>
+                                    )}
                                     <button className="btn btn-primary btn-lg" onClick={startMedia}>
                                         🚀 Start Interview
                                     </button>
@@ -435,6 +518,16 @@ export default function LiveInterview() {
                         <div ref={transcriptEndRef} />
                     </div>
                 </div>
+
+                {/* Code Editor Panel — shown when toggled on */}
+                {showCodeEditor && (
+                    <div className="code-editor-wrapper">
+                        <CodeEditor
+                            wsRef={wsRef}
+                            onClose={() => setShowCodeEditor(false)}
+                        />
+                    </div>
+                )}
 
                 {/* Side Panel */}
                 <div className="side-panel">
