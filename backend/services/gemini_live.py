@@ -1,13 +1,14 @@
 """
 Gemini Live API handler using google-genai SDK.
 Manages real-time bidirectional audio streaming sessions.
+Uses Vertex AI with Application Default Credentials (ADC).
+Configured for gemini-live-2.5-flash-native-audio model.
 """
 import asyncio
-import base64
 import logging
 from google import genai
 from google.genai import types
-from config import GOOGLE_API_KEY, GEMINI_MODEL
+from config import GEMINI_MODEL, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +18,22 @@ class GeminiLiveSession:
 
     def __init__(self, system_prompt: str):
         self.system_prompt = system_prompt
-        self.client = genai.Client(api_key=GOOGLE_API_KEY)
+        self.client = genai.Client(
+            vertexai=True,
+            project=GOOGLE_CLOUD_PROJECT,
+            location=GOOGLE_CLOUD_LOCATION,
+        )
         self.session = None
         self.is_active = False
-        self._receive_task = None
+        self._context_manager = None
 
     async def connect(self):
         """Establish connection to Gemini Live API."""
         try:
             config = types.LiveConnectConfig(
-                response_modalities=["AUDIO", "TEXT"],
+                response_modalities=["AUDIO"],
+                output_audio_transcription=types.AudioTranscriptionConfig(),
+                input_audio_transcription=types.AudioTranscriptionConfig(),
                 system_instruction=types.Content(
                     parts=[types.Part(text=self.system_prompt)]
                 ),
@@ -39,10 +46,12 @@ class GeminiLiveSession:
                 ),
             )
 
-            self.session = await self.client.aio.live.connect(
+            # live.connect() returns an async context manager
+            self._context_manager = self.client.aio.live.connect(
                 model=GEMINI_MODEL,
                 config=config,
             )
+            self.session = await self._context_manager.__aenter__()
             self.is_active = True
             logger.info("Gemini Live session connected")
             return True
@@ -68,6 +77,8 @@ class GeminiLiveSession:
             )
         except Exception as e:
             logger.error(f"Error sending audio: {e}")
+            # If the connection is dead, mark inactive to stop further sends
+            self.is_active = False
 
     async def send_text(self, text: str):
         """Send text input to Gemini (for context injection)."""
@@ -88,33 +99,56 @@ class GeminiLiveSession:
         except Exception as e:
             logger.error(f"Error sending text: {e}")
 
-    async def receive_responses(self, on_audio=None, on_text=None, on_turn_complete=None):
+    async def receive_responses(self, on_audio=None, on_text=None, on_turn_complete=None, on_input_transcription=None):
         """
         Listen for responses from Gemini. Calls callbacks for audio/text/turn_complete events.
-        This runs as a long-lived coroutine.
+        For native audio models, text comes via output_transcription, not model_turn.parts.text.
+        Re-enters the receive loop after each turn since session.receive() yields
+        responses for a single turn and then the iterator ends.
         """
         if not self.session or not self.is_active:
             return
 
         try:
-            async for response in self.session.receive():
-                if not self.is_active:
+            while self.is_active:
+                turn_received = False
+                async for response in self.session.receive():
+                    if not self.is_active:
+                        return
+
+                    server_content = response.server_content
+                    if server_content:
+                        # Audio data from model turn
+                        if server_content.model_turn:
+                            for part in server_content.model_turn.parts:
+                                if part.inline_data and part.inline_data.data:
+                                    if on_audio:
+                                        await on_audio(part.inline_data.data)
+
+                        # AI speech transcription
+                        if server_content.output_transcription and server_content.output_transcription.text:
+                            if on_text:
+                                await on_text(server_content.output_transcription.text)
+
+                        # User speech transcription
+                        if server_content.input_transcription and server_content.input_transcription.text:
+                            if on_input_transcription:
+                                await on_input_transcription(server_content.input_transcription.text)
+
+                        if server_content.turn_complete:
+                            logger.info("Gemini turn complete, re-entering receive loop...")
+                            if on_turn_complete:
+                                await on_turn_complete()
+                            turn_received = True
+
+                        if server_content.interrupted:
+                            logger.info("Gemini turn was interrupted by user")
+                            turn_received = True
+
+                if not turn_received:
+                    # Iterator ended without a turn_complete — session may be dead
+                    logger.warning("Gemini receive iterator ended unexpectedly")
                     break
-
-                server_content = response.server_content
-                if server_content:
-                    if server_content.model_turn:
-                        for part in server_content.model_turn.parts:
-                            if part.inline_data and part.inline_data.data:
-                                if on_audio:
-                                    await on_audio(part.inline_data.data)
-                            if part.text:
-                                if on_text:
-                                    await on_text(part.text)
-
-                    if server_content.turn_complete:
-                        if on_turn_complete:
-                            await on_turn_complete()
 
         except asyncio.CancelledError:
             logger.info("Receive task cancelled")
@@ -124,16 +158,11 @@ class GeminiLiveSession:
     async def disconnect(self):
         """Close the Gemini Live session."""
         self.is_active = False
-        if self._receive_task:
-            self._receive_task.cancel()
+        if self._context_manager:
             try:
-                await self._receive_task
-            except asyncio.CancelledError:
-                pass
-        if self.session:
-            try:
-                await self.session.close()
+                await self._context_manager.__aexit__(None, None, None)
             except Exception:
                 pass
-            self.session = None
+            self._context_manager = None
+        self.session = None
         logger.info("Gemini Live session disconnected")

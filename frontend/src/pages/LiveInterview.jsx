@@ -9,8 +9,9 @@ export default function LiveInterview() {
     const { sessionId } = useParams()
     const navigate = useNavigate()
 
-    const [status, setStatus] = useState('connecting') // connecting, ready, active, ended
+    const [status, setStatus] = useState('connecting') // connecting, ready, active, ended, error
     const [statusMessage, setStatusMessage] = useState('Initializing...')
+    const [errorMessage, setErrorMessage] = useState(null)
     const [transcript, setTranscript] = useState([])
     const [currentEmotion, setCurrentEmotion] = useState(null)
     const [elapsed, setElapsed] = useState(0)
@@ -29,6 +30,7 @@ export default function LiveInterview() {
     const audioQueueRef = useRef([])
     const isPlayingRef = useRef(false)
     const partialTextRef = useRef('')
+    const partialUserTextRef = useRef('')
 
     // Auto-scroll transcript
     useEffect(() => {
@@ -86,14 +88,17 @@ export default function LiveInterview() {
 
     // ── WebSocket Connection ────────────────────────
     useEffect(() => {
+        let cancelled = false
         const ws = new WebSocket(`${WS_URL}/ws/interview/${sessionId}`)
         wsRef.current = ws
 
         ws.onopen = () => {
+            if (cancelled) { ws.close(); return }
             setStatusMessage('Connected to server...')
         }
 
         ws.onmessage = (event) => {
+            if (cancelled) return
             const data = JSON.parse(event.data)
 
             switch (data.type) {
@@ -125,8 +130,22 @@ export default function LiveInterview() {
                                 return updated
                             })
                         }
-                    } else {
-                        setTranscript(prev => [...prev, { role: data.role, content: data.content, partial: false }])
+                    } else if (data.role === 'candidate') {
+                        if (data.partial) {
+                            partialUserTextRef.current += data.content
+                            setTranscript(prev => {
+                                const updated = [...prev]
+                                const lastIdx = updated.length - 1
+                                if (lastIdx >= 0 && updated[lastIdx].role === 'candidate' && updated[lastIdx].partial) {
+                                    updated[lastIdx] = { ...updated[lastIdx], content: partialUserTextRef.current }
+                                } else {
+                                    updated.push({ role: 'candidate', content: partialUserTextRef.current, partial: true })
+                                }
+                                return updated
+                            })
+                        } else {
+                            setTranscript(prev => [...prev, { role: data.role, content: data.content, partial: false }])
+                        }
                     }
                     break
 
@@ -141,6 +160,16 @@ export default function LiveInterview() {
                             return updated
                         })
                         partialTextRef.current = ''
+                    } else if (data.role === 'candidate') {
+                        setTranscript(prev => {
+                            const updated = [...prev]
+                            const lastIdx = updated.length - 1
+                            if (lastIdx >= 0 && updated[lastIdx].role === 'candidate') {
+                                updated[lastIdx] = { ...updated[lastIdx], partial: false }
+                            }
+                            return updated
+                        })
+                        partialUserTextRef.current = ''
                     }
                     break
 
@@ -149,33 +178,45 @@ export default function LiveInterview() {
                     break
 
                 case 'error':
-                    setStatusMessage(`Error: ${data.message}`)
+                    setErrorMessage(data.message)
+                    setStatus('error')
                     break
             }
         }
 
         ws.onerror = () => {
-            setStatusMessage('Connection error. Please try again.')
-            setStatus('ended')
+            if (cancelled) return
+            setErrorMessage('Could not connect to the server. Make sure the backend is running on port 8000.')
+            setStatus('error')
         }
 
         ws.onclose = () => {
-            if (status !== 'ended') {
-                setStatus('ended')
-            }
+            if (cancelled) return
+            setStatus(prev => {
+                if (prev === 'ended' || prev === 'error') return prev
+                return 'ended'
+            })
         }
 
         return () => {
+            cancelled = true
             ws.close()
             stopMedia()
         }
     }, [sessionId])
 
     // ── Start Media ─────────────────────────────────
+    const isMutedRef = useRef(false)
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        isMutedRef.current = isMuted
+    }, [isMuted])
+
     const startMedia = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+                audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
                 video: { width: 320, height: 240, facingMode: 'user' },
             })
             mediaStreamRef.current = stream
@@ -185,23 +226,40 @@ export default function LiveInterview() {
                 videoRef.current.srcObject = stream
             }
 
-            // Audio processing
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 })
+            // Audio processing — resample to 16kHz PCM s16le mono
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+            const nativeSampleRate = audioCtx.sampleRate
+            const targetSampleRate = 16000
             const source = audioCtx.createMediaStreamSource(stream)
             const processor = audioCtx.createScriptProcessor(4096, 1, 1)
 
             processor.onaudioprocess = (e) => {
-                if (isMuted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+                if (isMutedRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
                 const float32 = e.inputBuffer.getChannelData(0)
-                const pcm16 = new Int16Array(float32.length)
-                for (let i = 0; i < float32.length; i++) {
-                    pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32768)))
+
+                // Resample from native rate to 16kHz
+                const ratio = targetSampleRate / nativeSampleRate
+                const newLength = Math.round(float32.length * ratio)
+                const pcm16 = new Int16Array(newLength)
+                for (let i = 0; i < newLength; i++) {
+                    const srcIdx = i / ratio
+                    const idx = Math.floor(srcIdx)
+                    const frac = srcIdx - idx
+                    const sample = idx + 1 < float32.length
+                        ? float32[idx] * (1 - frac) + float32[idx + 1] * frac
+                        : float32[idx]
+                    pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(sample * 32768)))
                 }
                 wsRef.current.send(pcm16.buffer)
             }
 
             source.connect(processor)
-            processor.connect(audioCtx.destination)
+            // Connect to a silent destination (ScriptProcessor requires being connected
+            // to output to work, but we don't want mic audio playing through speakers)
+            const silentGain = audioCtx.createGain()
+            silentGain.gain.value = 0
+            processor.connect(silentGain)
+            silentGain.connect(audioCtx.destination)
             processorRef.current = { audioCtx, source, processor }
 
             // Webcam frame capture every 5 seconds
@@ -274,7 +332,7 @@ export default function LiveInterview() {
                     <span className="topbar-logo">🎯 MockMaster</span>
                     <span className={`status-indicator ${status}`}>
                         <span className="status-dot"></span>
-                        {status === 'active' ? 'Live' : status === 'connecting' ? 'Connecting' : status === 'ready' ? 'Ready' : 'Ended'}
+                        {status === 'active' ? 'Live' : status === 'connecting' ? 'Connecting' : status === 'ready' ? 'Ready' : status === 'error' ? 'Error' : 'Ended'}
                     </span>
                 </div>
                 <div className="topbar-center">
@@ -298,13 +356,27 @@ export default function LiveInterview() {
             {/* ── Main Content ─────────────────────── */}
             <div className="interview-main">
                 {/* Status overlay */}
-                {(status === 'connecting' || status === 'ready') && (
+                {(status === 'connecting' || status === 'ready' || status === 'error') && (
                     <div className="interview-overlay">
                         <div className="overlay-content glass-card">
                             {status === 'connecting' ? (
                                 <>
                                     <div className="spinner" style={{ width: 48, height: 48 }}></div>
                                     <h2>{statusMessage}</h2>
+                                </>
+                            ) : status === 'error' ? (
+                                <>
+                                    <div className="error-icon">⚠️</div>
+                                    <h2>Interview Failed</h2>
+                                    <p className="error-detail">{errorMessage || 'An unknown error occurred.'}</p>
+                                    <div className="error-actions">
+                                        <button className="btn btn-primary" onClick={() => navigate('/setup')}>
+                                            ← Back to Setup
+                                        </button>
+                                        <button className="btn btn-secondary" onClick={() => window.location.reload()}>
+                                            🔄 Retry
+                                        </button>
+                                    </div>
                                 </>
                             ) : (
                                 <>

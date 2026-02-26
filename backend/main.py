@@ -48,10 +48,10 @@ def on_startup():
 # ── Health Check ────────────────────────────────────
 @app.get("/api/health")
 def health_check():
-    from config import GOOGLE_API_KEY
+    from config import GOOGLE_CLOUD_PROJECT
     return {
         "status": "ok",
-        "api_key_configured": bool(GOOGLE_API_KEY),
+        "gcp_project_configured": bool(GOOGLE_CLOUD_PROJECT),
     }
 
 

@@ -29,11 +29,13 @@ class InterviewWebSocketHandler:
         self.start_time: float = 0
         self.is_active = False
         self._current_ai_text = ""
+        self._current_user_text = ""
 
     async def run(self):
         """Main handler loop."""
         await self.websocket.accept()
         db = SessionLocal()
+        self._audio_chunk_count = 0
 
         try:
             # Load interview session from DB
@@ -44,6 +46,14 @@ class InterviewWebSocketHandler:
             if not session:
                 await self._send_json({"type": "error", "message": "Session not found"})
                 return
+
+            # If session was already completed (e.g. from a previous aborted connection),
+            # reset it so it can be re-used
+            if session.status == "completed":
+                session.status = "created"
+                session.transcript = []
+                session.duration_seconds = 0
+                db.commit()
 
             # Build system prompt
             system_prompt = self._build_prompt(session, db)
@@ -70,6 +80,7 @@ class InterviewWebSocketHandler:
                     on_audio=self._handle_gemini_audio,
                     on_text=self._handle_gemini_text,
                     on_turn_complete=self._handle_turn_complete,
+                    on_input_transcription=self._handle_user_transcription,
                 )
             )
 
@@ -81,8 +92,16 @@ class InterviewWebSocketHandler:
                     if message.get("type") == "websocket.disconnect":
                         break
 
+                    # Check if Gemini connection died
+                    if not self.gemini_session.is_active:
+                        await self._send_json({"type": "error", "message": "AI connection lost. Please start a new interview."})
+                        break
+
                     if "bytes" in message:
                         # Raw PCM audio from client mic
+                        self._audio_chunk_count += 1
+                        if self._audio_chunk_count <= 3 or self._audio_chunk_count % 100 == 0:
+                            logger.info(f"Session {self.session_id}: audio chunk #{self._audio_chunk_count}, size={len(message['bytes'])} bytes")
                         await self.gemini_session.send_audio(message["bytes"])
 
                     elif "text" in message:
@@ -101,11 +120,15 @@ class InterviewWebSocketHandler:
                 pass
 
             # Save final state
-            elapsed = int(time.time() - self.start_time)
-            session.status = "completed"
-            session.duration_seconds = elapsed
-            session.transcript = self.transcript
-            db.commit()
+            try:
+                elapsed = int(time.time() - self.start_time)
+                session.status = "completed"
+                session.duration_seconds = elapsed
+                session.transcript = self.transcript
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.error("Failed to save final session state")
 
         except Exception as e:
             logger.error(f"WebSocket handler error: {e}")
@@ -166,6 +189,19 @@ class InterviewWebSocketHandler:
 
     async def _handle_turn_complete(self):
         """Handle Gemini turn completion."""
+        # Save any accumulated user text first
+        if self._current_user_text:
+            self.transcript.append({
+                "role": "candidate",
+                "content": self._current_user_text,
+                "timestamp": time.time() - self.start_time,
+            })
+            try:
+                await self._send_json({"type": "turn_complete", "role": "candidate"})
+            except Exception:
+                pass
+            self._current_user_text = ""
+
         if self._current_ai_text:
             self.transcript.append({
                 "role": "interviewer",
@@ -178,6 +214,19 @@ class InterviewWebSocketHandler:
             await self._send_json({"type": "turn_complete", "role": "interviewer"})
         except Exception as e:
             logger.error(f"Error sending turn complete: {e}")
+
+    async def _handle_user_transcription(self, text: str):
+        """Handle user speech transcription from Gemini input_transcription."""
+        self._current_user_text += text
+        try:
+            await self._send_json({
+                "type": "transcript",
+                "role": "candidate",
+                "content": text,
+                "partial": True,
+            })
+        except Exception as e:
+            logger.error(f"Error sending user transcription: {e}")
 
     async def _handle_client_message(self, data: dict, db: Session):
         """Handle typed messages from the client."""
@@ -214,6 +263,8 @@ class InterviewWebSocketHandler:
 
     async def _analyze_emotion_frame(self, base64_image: str, db: Session):
         """Analyze a webcam frame for emotions and store result."""
+        # Use a separate DB session to avoid poisoning the main session on error
+        emotion_db = SessionLocal()
         try:
             result = analyze_frame(base64_image)
             if result:
@@ -229,8 +280,8 @@ class InterviewWebSocketHandler:
                     stress_score=result["stress_score"],
                     confidence_score=result["confidence_score"],
                 )
-                db.add(snapshot)
-                db.commit()
+                emotion_db.add(snapshot)
+                emotion_db.commit()
 
                 # Send to client
                 await self._send_json({
@@ -239,7 +290,10 @@ class InterviewWebSocketHandler:
                     "data": result,
                 })
         except Exception as e:
+            emotion_db.rollback()
             logger.error(f"Emotion analysis error: {e}")
+        finally:
+            emotion_db.close()
 
     async def _send_json(self, data: dict):
         """Send JSON message to client."""

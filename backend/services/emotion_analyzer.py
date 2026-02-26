@@ -60,7 +60,8 @@ def analyze_frame(base64_image: str) -> dict | None:
         dominant = result.get("dominant_emotion", "neutral")
 
         # Normalize to 0-1 range (DeepFace returns percentages)
-        emotions_normalized = {k: round(v / 100, 4) for k, v in emotions.items()}
+        # Convert np.float32 → Python float to avoid JSON serialization errors
+        emotions_normalized = {k: round(float(v) / 100, 4) for k, v in emotions.items()}
 
         # Compute stress & confidence scores
         stress_score = _compute_stress(emotions_normalized)
@@ -68,9 +69,9 @@ def analyze_frame(base64_image: str) -> dict | None:
 
         return {
             "emotions": emotions_normalized,
-            "dominant_emotion": dominant,
-            "stress_score": round(stress_score, 4),
-            "confidence_score": round(confidence_score, 4),
+            "dominant_emotion": str(dominant),
+            "stress_score": round(float(stress_score), 4),
+            "confidence_score": round(float(confidence_score), 4),
         }
 
     except Exception as e:

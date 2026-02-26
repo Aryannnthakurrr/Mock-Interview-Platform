@@ -1,11 +1,17 @@
 """
 Gemini text generation wrapper for resume parsing, feedback generation, etc.
+Uses Vertex AI with Application Default Credentials (ADC).
 """
 import json
 from google import genai
-from config import GOOGLE_API_KEY, GEMINI_TEXT_MODEL
+from config import GEMINI_TEXT_MODEL, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION
 
-client = genai.Client(api_key=GOOGLE_API_KEY)
+# Vertex AI with ADC — explicit args required for google-genai v1.5
+client = genai.Client(
+    vertexai=True,
+    project=GOOGLE_CLOUD_PROJECT,
+    location=GOOGLE_CLOUD_LOCATION,
+)
 
 
 async def generate_text(prompt: str, system_instruction: str = "") -> str:
